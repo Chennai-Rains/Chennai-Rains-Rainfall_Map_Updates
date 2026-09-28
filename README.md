@@ -1,49 +1,52 @@
-# Rainfall Map Updates — automated toggleable rainfall blend map
+# Temperature Map — automated interactive temperature map
 
-Twice a day (4 AM / 4 PM IST), pulls the latest 7-day rainfall forecast
-from 8 atomic model sources — ECMWF HRES, EPS, AIFS (Deterministic), AIFS
-Ensembles, GEM, ICON, GFS, and WeatherNext 3 — and publishes a fully
-client-side toggleable HTML map (all blending/coloring happens in the
-browser via JS, no backend) to `plots.chennairains.com`.
+Twice a day (4 AM / 4 PM IST), pulls the latest 7-day temperature outlook
+from ECMWF HRES and ICON and publishes an interactive HTML map — Daily
+Max, Daily Min, a 6-hourly diurnal cycle, and UTCI heat stress (ECMWF
+only) — to `plots.chennairains.com`.
 
-`rainfall_map_bot.py` is extracted from the interactive Colab notebook
-(`Rainfall_7day_Interactive.ipynb`) that this project was originally
-developed in — that notebook stays the place to develop and test new
-model-blend logic live. This script is only the part that needs to run
-unattended on a schedule. Unlike the [IMD radar nowcast bot](https://github.com/Chennai-Rains/IMD_Radar_Updates),
-this pipeline keeps **no state between runs** — every cycle downloads
-everything fresh and builds one complete, self-contained map, so there's
-nothing to persist or track.
+`temp_map_bot.py` is extracted from the interactive Colab notebook
+(`Temp_7Day_interactive.ipynb`) that this project was originally developed
+in — that notebook stays the place to develop and test new logic live.
+This script is only the part that needs to run unattended on a schedule.
+Like the [radar nowcast bot](https://github.com/Chennai-Rains/IMD_Radar_Updates),
+it uploads via FTP; unlike it, this pipeline keeps **no state between
+runs** — every cycle downloads everything fresh and builds one complete,
+self-contained map.
 
-## Two things changed from the notebook to run headless
+## Why no WeatherNext 3
 
-The notebook was written for interactive use in Colab, which two of its
-steps depend on:
+This repo previously automated a different product — a 7-day rainfall
+blend map across 8 model sources, including WeatherNext 3. That product
+was pulled back out of GitHub automation (see git history for the full
+debugging trail) because WeatherNext 3's source bucket only grants list
+access to individually Google-Form-registered accounts, not something a
+CI identity can join without a heavier OAuth-refresh-token setup. The
+rainfall map now runs manually via Colab instead.
 
-1. **WeatherNext 3** data lives in a Google Cloud Storage bucket the
-   notebook reads via `google.colab.auth.authenticate_user()` — an
-   interactive sign-in that doesn't exist outside Colab. This pipeline
-   uses an anonymous GCS client instead, on the assumption the bucket is
-   actually publicly readable. **This hasn't been verified against a real
-   run yet** — watch the first scheduled/manual run's logs for this
-   specifically; if it turns out real credentials are needed, the fix is a
-   GCP service-account key added as a secret, not a code change.
-2. **State/district boundaries** are read from `data/` in this repo
-   instead of a Google Drive mount — see `data/README.md`. The map still
-   builds and publishes without them (just missing the boundary toggle
-   layers) until those two files are added.
+This temperature map only ever needed ECMWF HRES and ICON (WeatherNext's
+temperature accuracy was found to be noticeably worse than the numerical
+models in testing), so it was never blocked by that issue and can run
+fully unattended on this repo's schedule from day one.
+
+## One thing changed from the notebook to run headless
+
+State/district boundaries are read from `data/` in this repo (already
+committed there from the earlier rainfall-map work — same two files,
+reused as-is since they're generic India boundaries) instead of a Google
+Drive mount.
 
 ## How it runs
 
-`.github/workflows/rainfall-map.yml` fires at 4 AM and 4 PM IST (cron) or
-on demand (the **Run workflow** button under the repo's Actions tab). Each
-run:
+`.github/workflows/temperature-map.yml` fires at 4 AM and 4 PM IST (cron)
+or on demand (the **Run workflow** button under the repo's Actions tab).
+Each run:
 
 1. Installs `libeccodes-dev` + the Python dependencies
-2. Runs `python rainfall_map_bot.py` — fetches all 8 sources (best-effort;
-   a source that's down or not yet published for this run just means that
+2. Runs `python temp_map_bot.py` — fetches HRES + ICON (best-effort; a
+   source that's down or not yet published for this run just means that
    model is missing from the toggle this cycle, not a failed build),
-   builds `output/toggle_rainfall_map.html`
+   builds `output/temperature_map.html`
 3. Uploads it to your cPanel hosting over FTP
 
 ## One-time setup
@@ -60,19 +63,17 @@ they need to be added here separately even though the values are the same):
 | `FTP_PASSWORD` | The FTP account password |
 | `FTP_REMOTE_DIR` | The remote path to upload into — same folder the radar bot uploads to (`plots.chennairains.com`'s document root), with a trailing slash |
 
-Then add the two boundary GeoJSON files to `data/` (see `data/README.md`).
-
-Once secrets are in place, trigger a manual run from the **Actions** tab
-(**Update toggleable rainfall map** → **Run workflow**) to confirm it
-works end to end before waiting for the first scheduled tick.
+Trigger a manual run from the **Actions** tab (**Update interactive
+temperature map** → **Run workflow**) to confirm it works end to end
+before waiting for the first scheduled tick.
 
 ## Running locally
 
 ```bash
 pip install -r requirements.txt
 # libeccodes-dev must also be installed as a system package
-python rainfall_map_bot.py
+python temp_map_bot.py
 ```
 
-Produces `output/toggle_rainfall_map.html` — open it directly in a browser
-to check it before it ever reaches the live site.
+Produces `output/temperature_map.html` — open it directly in a browser to
+check it before it ever reaches the live site.

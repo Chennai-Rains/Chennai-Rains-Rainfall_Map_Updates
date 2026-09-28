@@ -9,17 +9,17 @@ GitHub Actions runner).
 - `India_State_Boundary.json` — India state boundaries, WGS84 GeoJSON
 - `India_District_Boundary.json` — India district boundaries, WGS84 GeoJSON
 
-These are the same two files the original notebook (`Rainfall_7day_Interactive.ipynb`)
-reads from `Interactive_Map/` in Google Drive, already pre-processed there
-(mapshaper-exported, coordinates rounded to 5 decimal places, trimmed to
-just the `STATE` / `District`+`STATE` attribute fields the map actually
-uses). Export/copy them here once from that same Drive folder — nothing in
-this pipeline reprocesses them, so this is a one-time step, not something
-that needs redoing per run.
+These were originally added for this repo's earlier rainfall-map product
+(`Rainfall_7day_Interactive.ipynb`), sourced from `Interactive_Map/` in
+Google Drive and pre-processed there (mapshaper-exported, coordinates
+rounded to 5 decimal places, trimmed to just the `STATE` / `District`+`STATE`
+attribute fields the map actually uses). They're generic India boundaries,
+not rainfall-specific, so `temp_map_bot.py` reuses them as-is for the
+temperature map -- nothing here needs redoing per run, or per product.
 
 ## Until they're here
 
-`rainfall_map_bot.py`'s `get_boundaries()` falls back to an empty
+`temp_map_bot.py`'s `get_boundaries()` falls back to an empty
 FeatureCollection for whichever file is missing rather than failing the
 whole build — the map still generates and uploads on schedule, just without
 the state/district boundary toggle layers filled in until these are added.

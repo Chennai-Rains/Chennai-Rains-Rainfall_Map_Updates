@@ -1,0 +1,62 @@
+name: Update interactive temperature map
+
+# Twice a day, 4 AM / 4 PM IST. Unlike this repo's earlier rainfall-map
+# product (see git history), this pipeline only pulls ECMWF HRES + ICON --
+# no WeatherNext 3 -- so it doesn't hit the WeatherNext account-registration
+# wall and can run fully unattended from day one.
+on:
+  schedule:
+    # Every day at 22:30 and 10:30 UTC = 4:00 AM and 4:00 PM IST.
+    - cron: "30 22,10 * * *"
+  workflow_dispatch: {}
+
+# Only one run at a time -- a twice-daily schedule shouldn't ever overlap,
+# but this is cheap insurance in case a run ever takes long enough to still
+# be going when the next one would start.
+concurrency:
+  group: temperature-map-pipeline
+  cancel-in-progress: false
+
+jobs:
+  update-map:
+    runs-on: ubuntu-latest
+    # Pulls from 2 sources (ECMWF HRES, ICON) and does real interpolation
+    # work (ICON's icosahedral regrid) -- generous timeout since actual
+    # per-source latency hasn't been measured yet on a real runner. Tighten
+    # once a few real runs show the typical duration.
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install eccodes (system package -- cfgrib and the eccodes python bindings both need the C library)
+        run: sudo apt-get update && sudo apt-get install -y libeccodes-dev
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build the interactive temperature map
+        run: python temp_map_bot.py
+
+      - name: Upload temperature_map.html to plots.chennairains.com
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: 21
+          protocol: ftps
+          local-dir: ./output/
+          server-dir: ${{ secrets.FTP_REMOTE_DIR }}
+          # Never delete anything already in that remote folder -- this
+          # only ever adds/overwrites temperature_map.html. Other pipelines
+          # (radar nowcast bot, etc.) upload their own files into this same
+          # remote folder, so a clean-slate deploy here would wipe those out.
+          dangerous-clean-slate: false
