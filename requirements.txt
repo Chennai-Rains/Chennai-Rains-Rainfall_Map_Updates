@@ -1,0 +1,13 @@
+numpy
+requests
+xarray
+scipy
+cfgrib
+ecmwf-opendata
+obstore
+zarr
+fsspec
+gcsfs
+google-cloud-storage
+eccodes
+matplotlib

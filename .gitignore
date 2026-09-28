@@ -1,0 +1,12 @@
+# Intermediate downloads the pipeline fetches fresh every run -- never
+# meant to be committed (no cross-run state here, unlike the radar bot).
+*.grib
+*.grib2
+probe.grib
+output/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
