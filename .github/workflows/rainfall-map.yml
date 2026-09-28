@@ -42,6 +42,14 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Build the toggleable rainfall map
+        env:
+          # obstore's GCSStore auto-detects this env var and authenticates
+          # with it (no code-side wiring needed) -- see rainfall_map_bot.py's
+          # fetch_weathernext() for why a real (even permission-less)
+          # service account identity is required: the WeatherNext 3 bucket
+          # is shared with allAuthenticatedUsers, not allUsers, so fully
+          # anonymous access gets a real 403 from Google's servers.
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
         run: python rainfall_map_bot.py
 
       - name: Upload toggle_rainfall_map.html to plots.chennairains.com

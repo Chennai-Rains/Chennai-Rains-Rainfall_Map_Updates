@@ -370,17 +370,32 @@ def fetch_weathernext():
     STATS_BUCKET = "weathernext3_statistics_spatial"
     STATS_PREFIX = "weathernext_3_0_0_statistics/zarr/2026_to_present/"
 
-    # Listing done via obstore (skip_signature=True), not
-    # google-cloud-storage: the first real run hit
-    # "Anonymous credentials cannot be refreshed" from
-    # storage.Client.create_anonymous_client().list_blobs() -- a known
-    # google-auth gotcha where AnonymousCredentials explicitly refuses any
-    # refresh() call, which some code paths trigger unconditionally before
-    # a request. obstore is a separate (Rust-based) client that never goes
-    # through google-auth's Python credentials machinery, so it doesn't hit
-    # this at all -- confirmed working for the zarr read itself (below) on
-    # that same first run, it was only the listing step that failed.
-    list_store = obstore.store.GCSStore(bucket=STATS_BUCKET, skip_signature=True)
+    # Two real things learned from actual GitHub Actions runs, in order:
+    #
+    # 1. Listing done via obstore, not google-cloud-storage: the first run
+    #    hit "Anonymous credentials cannot be refreshed" from
+    #    storage.Client.create_anonymous_client().list_blobs() -- a known
+    #    google-auth gotcha where AnonymousCredentials explicitly refuses
+    #    any refresh() call, which some code paths trigger unconditionally
+    #    before a request. obstore is a separate (Rust-based) client that
+    #    never goes through google-auth's Python credentials machinery, so
+    #    it doesn't hit this at all.
+    #
+    # 2. skip_signature=True (fully anonymous, no identity at all) is NOT
+    #    enough on its own: the second run got a real, authoritative 403
+    #    from Google's servers -- "Anonymous caller does not have
+    #    storage.objects.list access" -- meaning this bucket is shared with
+    #    allAuthenticatedUsers (any signed-in Google identity), not
+    #    allUsers (literally anyone). That's exactly what
+    #    google.colab.auth.authenticate_user() was providing in the
+    #    original notebook, not just Colab boilerplate as first assumed.
+    #    GCSStore() below is given no skip_signature and no explicit
+    #    credentials -- it picks up GOOGLE_SERVICE_ACCOUNT_KEY from the
+    #    environment automatically (obstore's own documented behavior),
+    #    which the workflow sets from the GCP_SERVICE_ACCOUNT_KEY secret.
+    #    The service account itself needs no bucket permissions -- being
+    #    *any* authenticated identity is what satisfies allAuthenticatedUsers.
+    list_store = obstore.store.GCSStore(bucket=STATS_BUCKET)
     listing = obstore.list_with_delimiter(list_store, prefix=STATS_PREFIX)
     # obstore's common_prefixes come back WITHOUT a trailing delimiter
     # (unlike google-cloud-storage's list_blobs(delimiter=...).prefixes,
@@ -393,7 +408,7 @@ def fetch_weathernext():
     latest_wn_run = (six_hourly_runs[-1] if six_hourly_runs else run_dirs[-1]) + "predictions.zarr"
     print(f"Using WeatherNext 3 run: {latest_wn_run}")
 
-    wn_store = obstore.store.GCSStore(bucket=STATS_BUCKET, prefix=latest_wn_run, skip_signature=True)
+    wn_store = obstore.store.GCSStore(bucket=STATS_BUCKET, prefix=latest_wn_run)
     zstore_wn = zarr.storage.ObjectStore(wn_store)
     ds_wn_stats = xr.open_zarr(zstore_wn, chunks={})
     precip_vars = [v for v in ds_wn_stats.data_vars if "precip" in v.lower() and v.endswith("_mean")]
