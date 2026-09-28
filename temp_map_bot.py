@@ -43,7 +43,6 @@ from scipy.interpolate import griddata
 
 OUTPUT_DIR = Path("output")
 DATA_DIR = Path("data")
-ASSETS_DIR = Path("assets")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # === Step 1 -- Config: extent, canonical grid, color scale ===
@@ -485,50 +484,9 @@ STATE_CAPITALS = [
 ]
 
 
-# === Step 9 -- Branding: logo + attribution watermark ===
-# Same approach as the radar nowcast bot (see Chennai-Rains/IMD_Radar_Updates) -- base64-embedded
-# so the map stays one self-contained file, watermark tiled faintly so a screenshot still carries
-# attribution and can't just be cropped from a corner.
-
-LOGO_PATH = ASSETS_DIR / "chennairains_logo.jpg"
-
-
-def _logo_data_uri():
-    if not LOGO_PATH.exists():
-        print(f"Logo asset not found at {LOGO_PATH} -- skipping branding.")
-        return None
-    encoded = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
-    return f"data:image/jpeg;base64,{encoded}"
-
-
-def build_logo_tag(height_px=26):
-    logo_uri = _logo_data_uri()
-    if not logo_uri:
-        return ""
-    return (
-        f'<a href="https://www.chennairains.com" target="_blank" rel="noopener" '
-        f'style="text-decoration:none; flex-shrink:0;">'
-        f'<img src="{logo_uri}" alt="ChennaiRains" '
-        f'style="height:{height_px}px; width:{height_px}px; display:block; '
-        f'border-radius:6px;"></a>'
-    )
-
-
-def build_watermark_data_uri(text="Temperature map by www.chennairains.com"):
-    watermark_svg = f"""
-    <svg xmlns='http://www.w3.org/2000/svg' width='460' height='260'>
-        <text x='230' y='135' transform='rotate(-28 230 135)'
-              font-family='Arial, sans-serif' font-size='13'
-              fill='rgba(0,0,0,0.14)' text-anchor='middle'
-              font-weight='600'>{text}</text>
-    </svg>
-    """
-    return "data:image/svg+xml;base64," + base64.b64encode(watermark_svg.encode("utf-8")).decode("ascii")
-
-
-# === Step 10 -- Build the client-side map: single-model select + field-type select ===
-# (HTML/JS unchanged from the notebook, aside from the __LOGO_TAG__/__WATERMARK_URI__
-# placeholders added for branding)
+# === Step 9 -- Build the client-side map: single-model select + field-type select ===
+# (HTML/JS unchanged from the notebook -- no logo/watermark branding on this map, unlike the
+# radar nowcast bot's map)
 
 HTML_TEMPLATE = r"""<!DOCTYPE html>
 <html>
@@ -543,11 +501,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   #sidebar {
     position:absolute; top:0; right:0; width:340px; height:100%; overflow-y:auto;
     background:#fff; box-shadow:-2px 0 6px rgba(0,0,0,0.15); padding:14px; box-sizing:border-box;
-  }
-  #sidebarTitle { display:flex; align-items:center; gap:8px; margin-top:0; }
-  #watermark {
-    position:absolute; inset:0; z-index:650; pointer-events:none;
-    background-image: url('__WATERMARK_URI__'); background-repeat: repeat;
   }
   .panel { border:1px solid #ddd; border-radius:6px; padding:10px; margin-bottom:12px; }
   .panel-title { font-weight:bold; font-size:13px; margin-bottom:6px; color:#333; }
@@ -604,9 +557,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 </style>
 </head>
 <body>
-<div id="map"><div id="valueReadout"></div><div id="watermark"></div></div>
+<div id="map"><div id="valueReadout"></div></div>
 <div id="sidebar">
-  <h3 id="sidebarTitle">__LOGO_TAG__<span>Temperature (T2 Max / Min / Diurnal)</span></h3>
+  <h3 style="margin-top:0;">Temperature (T2 Max / Min / Diurnal)</h3>
 
   <div class="panel">
     <div class="panel-title">Model</div>
@@ -967,8 +920,6 @@ def build_map_html(grids, day_labels, state_boundary_geojson, district_boundary_
     day_options_html = "".join(f'<option value="{d}">{day_labels[d]}</option>' for d in sorted(day_labels.keys()))
 
     final_html = HTML_TEMPLATE
-    final_html = final_html.replace("__LOGO_TAG__", build_logo_tag())
-    final_html = final_html.replace("__WATERMARK_URI__", build_watermark_data_uri())
     final_html = final_html.replace("__DAY_OPTIONS_HTML__", day_options_html)
     final_html = final_html.replace("__NUM_BLOCKS__", str(len(six_hour_steps_full)))
     final_html = final_html.replace("__FIRST_BLOCK_LABEL__", grids["instant_block_labels"].get(1, ""))
