@@ -364,17 +364,31 @@ def get_gfs_24h_mm(end_step):
 def fetch_weathernext():
     global wn_precip_hourly_mean, wn_max_lead_hours
 
-    from google.cloud import storage
     import obstore
     import zarr
 
     STATS_BUCKET = "weathernext3_statistics_spatial"
     STATS_PREFIX = "weathernext_3_0_0_statistics/zarr/2026_to_present/"
 
-    gcs_client = storage.Client.create_anonymous_client()
-    it = gcs_client.list_blobs(STATS_BUCKET, prefix=STATS_PREFIX, delimiter="/")
-    list(it)
-    run_dirs = sorted(it.prefixes)
+    # Listing done via obstore (skip_signature=True), not
+    # google-cloud-storage: the first real run hit
+    # "Anonymous credentials cannot be refreshed" from
+    # storage.Client.create_anonymous_client().list_blobs() -- a known
+    # google-auth gotcha where AnonymousCredentials explicitly refuses any
+    # refresh() call, which some code paths trigger unconditionally before
+    # a request. obstore is a separate (Rust-based) client that never goes
+    # through google-auth's Python credentials machinery, so it doesn't hit
+    # this at all -- confirmed working for the zarr read itself (below) on
+    # that same first run, it was only the listing step that failed.
+    list_store = obstore.store.GCSStore(bucket=STATS_BUCKET, skip_signature=True)
+    listing = obstore.list_with_delimiter(list_store, prefix=STATS_PREFIX)
+    # obstore's common_prefixes come back WITHOUT a trailing delimiter
+    # (unlike google-cloud-storage's list_blobs(delimiter=...).prefixes,
+    # which include it) -- confirmed against an in-memory store since this
+    # couldn't be checked against the real bucket from the dev sandbox.
+    # Normalized here so "+ predictions.zarr" below still lands as a
+    # sibling path inside the run directory, not concatenated onto its name.
+    run_dirs = sorted(p if p.endswith("/") else p + "/" for p in listing["common_prefixes"])
     six_hourly_runs = [d for d in run_dirs if any(f"_{h}hr_" in d for h in ("00", "06", "12", "18"))]
     latest_wn_run = (six_hourly_runs[-1] if six_hourly_runs else run_dirs[-1]) + "predictions.zarr"
     print(f"Using WeatherNext 3 run: {latest_wn_run}")
