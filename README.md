@@ -46,7 +46,7 @@ Each run:
 2. Runs `python temp_map_bot.py` — fetches HRES + ICON (best-effort; a
    source that's down or not yet published for this run just means that
    model is missing from the toggle this cycle, not a failed build),
-   builds `output/temperature_map.html`
+   builds `output/Temp_interactive.html`
 3. Uploads it to your cPanel hosting over FTP
 
 ## One-time setup
@@ -75,5 +75,5 @@ pip install -r requirements.txt
 python temp_map_bot.py
 ```
 
-Produces `output/temperature_map.html` — open it directly in a browser to
+Produces `output/Temp_interactive.html` — open it directly in a browser to
 check it before it ever reaches the live site.

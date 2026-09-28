@@ -45,7 +45,7 @@ jobs:
       - name: Build the interactive temperature map
         run: python temp_map_bot.py
 
-      - name: Upload temperature_map.html to plots.chennairains.com
+      - name: Upload Temp_interactive.html to plots.chennairains.com
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_HOST }}
@@ -56,7 +56,7 @@ jobs:
           local-dir: ./output/
           server-dir: ${{ secrets.FTP_REMOTE_DIR }}
           # Never delete anything already in that remote folder -- this
-          # only ever adds/overwrites temperature_map.html. Other pipelines
+          # only ever adds/overwrites Temp_interactive.html. Other pipelines
           # (radar nowcast bot, etc.) upload their own files into this same
           # remote folder, so a clean-slate deploy here would wipe those out.
           dangerous-clean-slate: false

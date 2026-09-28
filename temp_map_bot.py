@@ -969,7 +969,7 @@ def run_pipeline() -> None:
     grids = build_all_grids()
     state_boundary_geojson, district_boundary_geojson = get_boundaries()
 
-    out_path = OUTPUT_DIR / "temperature_map.html"
+    out_path = OUTPUT_DIR / "Temp_interactive.html"
     build_map_html(grids, grids["day_labels"], state_boundary_geojson, district_boundary_geojson, str(out_path))
 
 
