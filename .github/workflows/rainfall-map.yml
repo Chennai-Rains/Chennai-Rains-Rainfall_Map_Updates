@@ -1,12 +1,17 @@
 name: Update toggleable rainfall map
 
+# Schedule intentionally disabled: WeatherNext 3's source bucket is scoped
+# to individually-registered Google accounts (confirmed after four
+# attempts -- anonymous access, then a fresh service account both got a
+# real 403 from Google's servers), not something a CI identity can join
+# without a heavier OAuth-refresh-token setup authenticating as the
+# account that actually registered. Decided to keep this product (and the
+# 6-hourly map) manual/Colab-only for now rather than either drop
+# WeatherNext from it or invest in that setup. workflow_dispatch is left
+# on so this can still be run/tested on demand -- every model except
+# WeatherNext 3 works fine unattended, it's just this one that's missing.
 on:
-  schedule:
-    # 4:00 AM and 4:00 PM IST = 22:30 and 10:30 UTC (IST is UTC+5:30).
-    - cron: "30 22,10 * * *"
   workflow_dispatch: {}
-    # Lets you trigger a run manually from the Actions tab any time you
-    # want to test a change without waiting for the next scheduled tick.
 
 # Only one run at a time -- a twice-daily schedule shouldn't ever overlap,
 # but this is cheap insurance in case a run ever takes long enough to still
