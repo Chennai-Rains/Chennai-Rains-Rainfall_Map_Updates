@@ -45,18 +45,31 @@ jobs:
       - name: Build the interactive temperature map
         run: python temp_map_bot.py
 
-      - name: Upload Temp_interactive.html to plots.chennairains.com
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          port: 21
-          protocol: ftps
-          local-dir: ./output/
-          server-dir: ${{ secrets.FTP_REMOTE_DIR }}
-          # Never delete anything already in that remote folder -- this
-          # only ever adds/overwrites Temp_interactive.html. Other pipelines
-          # (radar nowcast bot, etc.) upload their own files into this same
-          # remote folder, so a clean-slate deploy here would wipe those out.
-          dangerous-clean-slate: false
+      - name: Upload Temp_interactive.html to plots.chennairains.com (atomic swap)
+        # Not FTP-Deploy-Action: it overwrites the live filename directly via
+        # STOR, and this file is 8+ MB, so the plain rewrite takes long enough
+        # over FTP that visitors hitting the URL mid-upload can get a broken
+        # or missing response -- reproduced on every single run. Instead:
+        # upload to a throwaway name, then rename it into place once the
+        # transfer is 100% complete. The live filename only ever points at a
+        # fully-written file -- rename is effectively instant, so there's no
+        # visible gap. If a run dies mid-upload, only the throwaway file is
+        # left broken; the live file is untouched until the next successful run.
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+        run: |
+          sudo apt-get install -y lftp
+          lftp -u "$FTP_USERNAME,$FTP_PASSWORD" -e "
+            set ftp:ssl-force true;
+            set ftp:ssl-protect-data true;
+            set ssl:verify-certificate no;
+            set ftp:passive-mode true;
+            cd $FTP_REMOTE_DIR;
+            put output/Temp_interactive.html -o Temp_interactive.uploading.html;
+            rm -f Temp_interactive.html;
+            mv Temp_interactive.uploading.html Temp_interactive.html;
+            bye
+          " "$FTP_HOST"
